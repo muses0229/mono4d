@@ -50,13 +50,27 @@ not for anything that must stay confidential.
 
 ## Deploy to GitHub Pages
 
+The deploy script needs a Personal Access Token because this machine cannot reach
+`github.com` over ssh (blocked by policy).
+
+1. Create a token at <https://github.com/settings/tokens> → *Generate new token
+   (classic)*, scope `repo`.
+2. Run:
+
 ```bash
-GITHUB_USER=<your-username> REPO=mono4d ./deploy.sh
+GITHUB_USER=<your-username> GITHUB_TOKEN=<token> REPO=mono4d ./deploy.sh
 ```
 
-Then once, in the repository settings: **Pages → Deploy from a branch → main → / (root)**.
+The token is passed to a single `git push` through a one-shot HTTP header; it is
+never written to `.git/config` or any file.
+
+3. Then once, in the repository settings: **Pages → Deploy from a branch →
+   main → / (root)**.
 
 The site lives at `https://<your-username>.github.io/<repo>/`.
+
+Without `GITHUB_TOKEN` the script still makes the local commit and prints the
+token instructions, so you can push later without redoing anything.
 
 ## Deploy
 
