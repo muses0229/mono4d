@@ -48,6 +48,13 @@ keeps the page out of search engines (`noindex`), but anyone who reads the HTML 
 fetch `page.html` and the assets directly. Use it for reviewers and collaborators,
 not for anything that must stay confidential.
 
+## Live site
+
+<https://muses0229.github.io/mono4d/>
+
+The repository is public (GitHub Pages requires it on the free plan), so the URL can
+be shared freely while the page itself stays behind the password gate.
+
 ## Deploy to GitHub Pages
 
 The deploy script needs a Personal Access Token because this machine cannot reach
