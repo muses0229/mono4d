@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mono4D — Lifting Single-Image 3D Gaussian Reconstruction to Coherent 4D Scenes</title>
+<meta name="description" content="Mono4D lifts feedforward single-image 3D Gaussian splatting models to monocular videos, producing temporally coherent 4D scenes with real-time novel view rendering — no additional training, no per-scene optimization.">
+<meta name="theme-color" content="#4a5bf5">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="Mono4D: Lifting Single-Image 3D Gaussian Reconstruction to Coherent 4D Scenes from Monocular Videos">
+<meta property="og:description" content="A geometry-aligned temporal Gaussian consolidation paradigm that turns per-frame feedforward 3DGS predictions into a coherent 4D scene.">
+<meta property="og:image" content="assets/figs/teaser.jpg">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234a5bf5'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='15' font-weight='bold' fill='white' text-anchor='middle'%3EM4%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/style.css">
+<script>
+  document.documentElement.className += ' js';
+  /* Redirect to the gate unless this session already unlocked it. */
+  (function () {
+    var ok = false;
+    try { ok = sessionStorage.getItem('mono4d.unlocked') === '1'; } catch (e) {}
+    if (!ok) location.replace('index.html');
+  })();
+</script>
+</head>
+<body>
+
+<!-- ================= NAV ================= -->
+<nav class="nav" id="nav">
+  <div class="wrap">
+    <a class="brand" href="#top">Mono4D</a>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="navLinks">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="nav-links" id="navLinks">
+      <a href="#demos">Videos</a>
+      <a href="#abstract">Abstract</a>
+      <a href="#method">Method</a>
+      <a href="#results">Results</a>
+      <a href="#bibtex">BibTeX</a>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <div class="wrap">
+    <div class="venue"><span class="dot"></span> arXiv Preprint</div>
+
+    <h1>Mono4D: Lifting Single-Image 3D Gaussian Reconstruction to <span class="grad">Coherent 4D Scenes</span> from Monocular Videos</h1>
+
+    <p class="subtitle">
+      A geometry-aligned temporal Gaussian consolidation paradigm that turns per-frame feedforward
+      3DGS predictions into one coherent 4D scene — with no extra 4D training and no per-scene optimization.
+    </p>
+
+    <div class="authors">
+      <span>Jingrui Ye<sup>1,2,3</sup></span>
+      <span>Ziqi Zhang<sup>1,2</sup></span>
+      <span>Linjie Guan<sup>2</sup></span>
+      <span>Zhongang Qi<sup>2,†</sup></span>
+      <span>Lixin Gao<sup>2</sup></span>
+      <span>Kanzhi Wu<sup>2</sup></span>
+      <span>Wei Li<sup>2</sup></span>
+      <span>Yuhuan Xie<sup>4</sup></span>
+      <span>Yuzhi Huang<sup>1</sup></span>
+      <span>Chao Wang<sup>3</sup></span>
+      <span>Ronggang Wang<sup>3</sup></span>
+      <span>Yujiu Yang<sup>1,†</sup></span>
+    </div>
+
+    <div class="affils">
+      <span><sup>1</sup> Tsinghua University, Shenzhen International Graduate School</span>
+      <span><sup>2</sup> BlueImage, vivo</span>
+      <span><sup>3</sup> Peng Cheng Laboratory</span>
+      <span><sup>4</sup> University of Hong Kong</span>
+    </div>
+    <p class="note"><sup>†</sup> Corresponding author</p>
+
+    <div class="cta">
+      <a class="btn btn-primary" href="assets/Mono4D_paper.pdf" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6M9 11h2"/></svg>
+        Paper
+      </a>
+      <a class="btn" href="#demos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>
+        Video Demos
+      </a>
+      <a class="btn" href="#bibtex">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        BibTeX
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- ================= VIDEO DEMOS ================= -->
+<section id="demos" class="tight">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2>Novel views from in-the-wild monocular videos</h2>
+      <p class="sec-sub">
+        All clips are rendered from a single monocular input. Hover to preview, click to open full screen.
+      </p>
+    </div>
+
+    <div class="vgrid" id="vgrid">
+
+      <!-- subjects -->
+      <article class="vcard reveal tall" data-cat="subject">
+        <div class="vframe" data-src="assets/videos/4danyone-0922-demo-1.mp4" style="--ar:1.0959">
+          <video src="assets/videos/4danyone-0922-demo-1.mp4" poster="assets/videos/4danyone-0922-demo-1.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <article class="vcard reveal tall" data-cat="subject">
+        <div class="vframe" data-src="assets/videos/4danyone-0922-demo-2.mp4" style="--ar:1.0959">
+          <video src="assets/videos/4danyone-0922-demo-2.mp4" poster="assets/videos/4danyone-0922-demo-2.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <article class="vcard reveal tall" data-cat="subject">
+        <div class="vframe" data-src="assets/videos/4danyone_demo_0924_v1.mp4" style="--ar:1.0884">
+          <video src="assets/videos/4danyone_demo_0924_v1.mp4" poster="assets/videos/4danyone_demo_0924_v1.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <article class="vcard reveal mid" data-cat="subject">
+        <div class="vframe" data-src="assets/videos/xhs-data-demo-1.mp4" style="--ar:1.3974">
+          <video src="assets/videos/xhs-data-demo-1.mp4" poster="assets/videos/xhs-data-demo-1.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <article class="vcard reveal tall" data-cat="subject">
+        <div class="vframe" data-src="assets/videos/xhs-data-demo-2.mp4" style="--ar:1.044">
+          <video src="assets/videos/xhs-data-demo-2.mp4" poster="assets/videos/xhs-data-demo-2.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <article class="vcard reveal tall" data-cat="subject">
+        <div class="vframe" data-src="assets/videos/xhs-data-demo-3.mp4" style="--ar:1.0866">
+          <video src="assets/videos/xhs-data-demo-3.mp4" poster="assets/videos/xhs-data-demo-3.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <article class="vcard reveal wide" data-cat="subject">
+        <div class="vframe" data-src="assets/videos/xhs-demo-0922-v1.mp4" style="--ar:2.0126">
+          <video src="assets/videos/xhs-demo-0922-v1.mp4" poster="assets/videos/xhs-demo-0922-v1.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <article class="vcard reveal mid" data-cat="subject">
+        <div class="vframe" data-src="assets/videos/xhs_demo_0924_v1.mp4" style="--ar:1.4254">
+          <video src="assets/videos/xhs_demo_0924_v1.mp4" poster="assets/videos/xhs_demo_0924_v1.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <!-- objects -->
+      <article class="vcard reveal wide" data-cat="object">
+        <div class="vframe" data-src="assets/videos/lyra-data-demo-1.mp4" style="--ar:4.0">
+          <video src="assets/videos/lyra-data-demo-1.mp4" poster="assets/videos/lyra-data-demo-1.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <article class="vcard reveal wide" data-cat="object">
+        <div class="vframe" data-src="assets/videos/lyra-data-demo-2.mp4" style="--ar:4.0">
+          <video src="assets/videos/lyra-data-demo-2.mp4" poster="assets/videos/lyra-data-demo-2.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <article class="vcard reveal wide" data-cat="object">
+        <div class="vframe" data-src="assets/videos/lyra-data-demo-3.mp4" style="--ar:4.0">
+          <video src="assets/videos/lyra-data-demo-3.mp4" poster="assets/videos/lyra-data-demo-3.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <article class="vcard reveal wide" data-cat="object">
+        <div class="vframe" data-src="assets/videos/lyra-data-demo-4.mp4" style="--ar:4.0">
+          <video src="assets/videos/lyra-data-demo-4.mp4" poster="assets/videos/lyra-data-demo-4.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <article class="vcard reveal wide" data-cat="object">
+        <div class="vframe" data-src="assets/videos/movie-plane-robot-1.mp4" style="--ar:3.5955">
+          <video src="assets/videos/movie-plane-robot-1.mp4" poster="assets/videos/movie-plane-robot-1.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+      </article>
+
+      <!-- comparisons -->
+      <article class="vcard reveal wide" data-cat="compare">
+        <div class="vframe" data-src="assets/videos/compare-bed-shopping-demo.mp4" style="--ar:2.2939">
+          <video src="assets/videos/compare-bed-shopping-demo.mp4" poster="assets/videos/compare-bed-shopping-demo.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+        <div class="vmeta"><span class="t">Comparison with baselines</span></div>
+      </article>
+
+      <article class="vcard reveal wide" data-cat="compare">
+        <div class="vframe" data-src="assets/videos/compare-phone-talk-demo.mp4" style="--ar:2.2939">
+          <video src="assets/videos/compare-phone-talk-demo.mp4" poster="assets/videos/compare-phone-talk-demo.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+        <div class="vmeta"><span class="t">Comparison with baselines</span></div>
+      </article>
+
+      <article class="vcard reveal wide" data-cat="compare">
+        <div class="vframe" data-src="assets/videos/compare-room-argue-demo.mp4" style="--ar:2.2939">
+          <video src="assets/videos/compare-room-argue-demo.mp4" poster="assets/videos/compare-room-argue-demo.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+        <div class="vmeta"><span class="t">Comparison with baselines</span></div>
+      </article>
+
+      <article class="vcard reveal wide" data-cat="compare">
+        <div class="vframe" data-src="assets/videos/compare-women-talk-demo.mp4" style="--ar:2.2939">
+          <video src="assets/videos/compare-women-talk-demo.mp4" poster="assets/videos/compare-women-talk-demo.jpg" muted loop playsinline preload="none"></video>
+          <div class="play"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></div>
+        </div>
+        <div class="vmeta"><span class="t">Comparison with baselines</span></div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ================= ABSTRACT ================= -->
+<section id="abstract">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="sec-kicker">Abstract</p>
+    </div>
+
+    <div class="abstract-box reveal">
+      <p>
+        Monocular 4D scene reconstruction is a challenging yet important task for immersive 3D applications.
+        Existing optimization-based methods require multi-view inputs and costly per-scene optimization, while
+        camera-controlled video generation methods lack explicit 3D representations and demand repeated inference
+        for new camera trajectories; yet recent feedforward 3D reconstruction models perform well on static scenes
+        but suffer from severe geometric and inter-frame inconsistencies when handling dynamic scenes.
+      </p>
+      <p>
+        To address these challenges, we introduce <strong>Mono4D</strong>, a framework built upon a
+        <strong>geometry-aligned temporal Gaussian consolidation reconstruction paradigm</strong> that lifts
+        single-image feedforward 3DGS models to monocular videos of dynamic scenes without additional 4D training
+        or per-scene optimization, enabling efficient nearby novel view rendering.
+      </p>
+      <p>
+        Given a monocular video, Mono4D estimates camera poses and obtains frame-wise 3DGS predictions from the
+        feedforward backbone, then aligns these per-frame Gaussian primitives into a shared world coordinate via
+        geometry alignment and cross-frame correspondence. Background Gaussians are aggregated into a globally
+        coherent background via spatial fusion, while foreground components are modeled as temporally indexed
+        Gaussian sequences. A boundary-aware Gaussian assignment strategy reduces edge artifacts near fine
+        structures. We further propose a motion-aware spatiotemporal Gaussian encoding scheme that exploits spatial
+        sparsity and temporal motion redundancy through Gaussian pruning, cluster-level motion encoding and residual
+        coding for a compact 4D representation. Extensive experiments on novel view synthesis benchmarks show that
+        Mono4D achieves superior visual fidelity and inference efficiency.
+      </p>
+    </div>
+
+    <div class="hl-grid">
+      <div class="hl reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M19.1 4.9l-2.8 2.8M7.7 16.3l-2.8 2.8"/></svg></div>
+        <h3>Geometry-aligned consolidation</h3>
+        <p>A closed-form sequence-level Sim(3) scale alignment plus dense cross-frame correspondences place every per-frame Gaussian in one shared world space.</p>
+      </div>
+      <div class="hl reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M17.5 14v7M14 17.5h7"/></svg></div>
+        <h3>Boundary-aware assignment</h3>
+        <p>Matting-refined masks with footprint-coverage weighting keep hair strands and motion-blurred edges out of the shared static background.</p>
+      </div>
+      <div class="hl reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <h3>Motion-aware encoding</h3>
+        <p>Importance pruning, cluster-level rigid motion and per-Gaussian residuals compress the dynamic sequence 21&times; while staying frame-decompressible.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TEASER ================= -->
+<section class="tight alt">
+  <div class="wrap">
+    <figure class="fig-card reveal">
+      <img src="assets/figs/teaser.jpg" alt="Mono4D teaser: input monocular video, decomposed 4D scene with novel camera trajectory, novel view renderings, and a bubble chart comparing LPIPS against inference time." data-zoom="assets/figs/teaser.jpg">
+      <figcaption>
+        <b>Mono4D overview.</b> <b>(a)</b> Given a monocular video, Mono4D decomposes the scene into a coherent
+        background and a temporally evolving dynamic Gaussian sequence, enabling real-time nearby novel view
+        synthesis. <b>(b)</b> Comparison against existing approaches; bubble area is inversely proportional to
+        LPIPS. Mono4D sits in the low-LPIPS / low-inference-time corner.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ================= METHOD ================= -->
+<section id="method">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="sec-kicker">Method</p>
+      <h2 class="sec-subtitle">Geometry-aligned temporal Gaussian consolidation</h2>
+      <p class="sec-sub">
+        Per-frame feedforward predictions live in separate local spaces. Mono4D consolidates them into a shared
+        background plus a time-indexed foreground — then compresses the result into a compact 4D scene.
+      </p>
+    </div>
+
+    <figure class="fig-card reveal">
+      <img src="assets/figs/pipeline.jpg" alt="Mono4D pipeline: motion segmentation, 3DGS backbone, camera estimation, geometry alignment, boundary-aware assignment, cross-frame static fusion, motion-aware spatiotemporal encoding, real-time rendering." data-zoom="assets/figs/pipeline.jpg">
+      <figcaption>
+        <b>Pipeline.</b> Motion segmentation, camera estimation and a frozen feedforward 3DGS backbone run in
+        parallel. Geometry-aligned consolidation fuses per-frame Gaussians into a unified background and
+        foreground sequences, refining positions with boundary-aware assignment. Motion-aware spatiotemporal
+        Gaussian encoding then removes intra- and inter-frame redundancy for efficient 4D rendering.
+      </figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ================= RESULTS ================= -->
+<section id="results" class="alt">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="sec-kicker">Results</p>
+      <p class="sec-sub">
+        A single-view video is used as input; novel views are evaluated on four excluded adjacent synchronized
+        views across real-world and synthetic benchmarks.
+      </p>
+    </div>
+
+    <div class="tbl reveal">
+      <p class="tbl-cap"><b>Quantitative results</b> on Neural-3D-Video and NVIDIA-Dynamic-Scene. Best and second-best are highlighted.</p>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr class="grp">
+            <th rowspan="2" style="vertical-align:bottom">Method</th>
+            <th colspan="5">Neural-3D-Video</th>
+            <th colspan="5">NVIDIA-Dynamic-Scene</th>
+          </tr>
+          <tr>
+            <th>PSNR&uarr;</th><th>SSIM&uarr;</th><th>LPIPS&darr;</th><th>T-LPIPS&darr;</th><th>DISTS&darr;</th>
+            <th>PSNR&uarr;</th><th>SSIM&uarr;</th><th>LPIPS&darr;</th><th>T-LPIPS&darr;</th><th>DISTS&darr;</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Inspatio-World</td>
+            <td>18.28</td><td>0.667</td><td>0.218</td><td><span class="second">0.106</span></td><td>0.143</td>
+            <td>15.58</td><td>0.469</td><td>0.374</td><td>0.282</td><td>0.128</td>
+          </tr>
+          <tr>
+            <td>NeoVerse</td>
+            <td>17.05</td><td>0.549</td><td>0.305</td><td>0.336</td><td>0.196</td>
+            <td>19.52</td><td>0.689</td><td>0.116</td><td>0.147</td><td>0.099</td>
+          </tr>
+          <tr>
+            <td>MoVieS</td>
+            <td>16.55</td><td>0.437</td><td>0.391</td><td>0.179</td><td>0.228</td>
+            <td>18.18</td><td>0.647</td><td><span class="second">0.079</span></td><td>0.129</td><td><span class="second">0.062</span></td>
+          </tr>
+          <tr>
+            <td>Instant4D</td>
+            <td>19.86</td><td>0.684</td><td>0.315</td><td>0.196</td><td>0.246</td>
+            <td><span class="best">20.28</span></td><td><span class="best">0.716</span></td><td>0.128</td><td>0.159</td><td>0.084</td>
+          </tr>
+          <tr class="ours sep">
+            <td>Ours</td>
+            <td><span class="best">21.30</span></td><td><span class="best">0.719</span></td><td><span class="best">0.143</span></td><td><span class="best">0.068</span></td><td><span class="best">0.051</span></td>
+            <td><span class="second">20.19</span></td><td><span class="second">0.697</span></td><td><span class="best">0.068</span></td><td><span class="best">0.051</span></td><td><span class="best">0.054</span></td>
+          </tr>
+          <tr class="ours">
+            <td>Ours (InfiniSplat)</td>
+            <td><span class="second">20.15</span></td><td><span class="second">0.692</span></td><td><span class="second">0.173</span></td><td>0.148</td><td><span class="second">0.135</span></td>
+            <td>18.54</td><td>0.663</td><td>0.094</td><td><span class="second">0.087</span></td><td>0.073</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i style="background:#d8f2e0"></i>best</span>
+      <span><i style="background:#fdf0cc"></i>second-best</span>
+      <span>PSNR / SSIM reward over-smoothed outputs; LPIPS, DISTS and T-LPIPS track human perception and temporal consistency.</span>
+    </div>
+
+    <figure class="fig-card reveal" style="margin-top:36px">
+      <img src="assets/figs/neural-3d_and_nvda-dyn_main.jpg" alt="Qualitative comparison on Neural-3D-Video and NVIDIA-Dynamic-Scene: input video, Inspatio-World, NeoVerse, MoVieS, Instant4D, Ours, ground truth." data-zoom="assets/figs/neural-3d_and_nvda-dyn_main.jpg">
+      <figcaption>
+        <b>Qualitative comparison</b> on Neural-3D-Video and NVIDIA-Dynamic-Scene. Generative baselines show
+        texture degradation and temporal flicker; MoVieS distorts moving objects; Instant4D over-blurs textures.
+        Mono4D preserves detail on both moving subjects and cluttered backgrounds while staying temporally stable.
+      </figcaption>
+    </figure>
+
+    <figure class="fig-card reveal" style="margin-top:20px">
+      <img src="assets/figs/neural-3d_and_nvda-dyn_appendix.jpg" alt="Qualitative comparison on Neural-3D-Video and NVIDIA-Dynamic-Scene." data-zoom="assets/figs/neural-3d_and_nvda-dyn_appendix.jpg">
+      <figcaption><b>More qualitative comparisons</b> on Neural-3D-Video and NVIDIA-Dynamic-Scene.</figcaption>
+    </figure>
+
+    <div class="tbl reveal" style="margin-top:36px">
+        <p class="tbl-cap"><b>StereoDataset</b> (synthetic benchmark).</p>
+        <div class="table-wrap">
+        <table style="min-width:0">
+          <thead>
+            <tr class="grp">
+              <th rowspan="2" style="vertical-align:bottom">Method</th>
+              <th colspan="5">StereoDataset</th>
+            </tr>
+            <tr>
+              <th>PSNR&uarr;</th><th>SSIM&uarr;</th><th>LPIPS&darr;</th><th>T-LPIPS&darr;</th><th>DISTS&darr;</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Inspatio-World</td><td>17.19</td><td>0.625</td><td>0.390</td><td>0.235</td><td>0.244</td></tr>
+            <tr><td>MoVieS</td><td>18.74</td><td>0.708</td><td><span class="second">0.235</span></td><td>0.178</td><td><span class="second">0.154</span></td></tr>
+            <tr><td>NeoVerse</td><td>14.25</td><td>0.654</td><td>0.527</td><td>0.270</td><td>0.186</td></tr>
+            <tr><td>Instant4D</td><td><span class="second">20.97</span></td><td><span class="second">0.720</span></td><td>0.240</td><td><span class="second">0.160</span></td><td>0.212</td></tr>
+            <tr class="ours sep">
+              <td>Ours</td>
+              <td><span class="best">23.68</span></td><td><span class="best">0.735</span></td><td><span class="best">0.059</span></td><td><span class="best">0.054</span></td><td><span class="best">0.046</span></td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+    </div>
+
+    <figure class="fig-card reveal" style="margin-top:36px">
+      <img src="assets/figs/stereo-static.jpg" alt="Qualitative comparison on the synthetic StereoDataset." data-zoom="assets/figs/stereo-static.jpg">
+      <figcaption><b>Qualitative comparison on StereoDataset.</b> Mono4D keeps thin geometry and saturated textures that baselines blur or hallucinate.</figcaption>
+    </figure>
+
+    <figure class="fig-card reveal" style="margin-top:20px">
+      <img src="assets/figs/vista4d-test.jpg" alt="Qualitative comparison on the Vista4D evaluation dataset." data-zoom="assets/figs/vista4d-test.jpg">
+      <figcaption><b>Qualitative comparison on the Vista4D evaluation dataset.</b></figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ================= BIBTEX ================= -->
+<section id="bibtex">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="sec-kicker">Citation</p>
+      <h2 class="sec-subtitle">BibTeX</h2>
+    </div>
+    <div class="bib reveal" style="max-width:860px;margin:0 auto">
+      <button class="copy-btn" id="copyBib" type="button">Copy</button>
+      <pre id="bibText">@misc{ye2027mono4d,
+  title         = {Mono4D: Lifting Single-Image 3D Gaussian Reconstruction
+                   to Coherent 4D Scenes from Monocular Videos},
+  author        = {Ye, Jingrui and Zhang, Ziqi and Guan, Linjie and Qi, Zhongang
+                   and Gao, Lixin and Wu, Kanzhi and Li, Wei and Xie, Yuhuan
+                   and Huang, Yuzhi and Wang, Chao and Wang, Ronggang and Yang, Yujiu},
+  year          = {2027},
+  eprint        = {XXXX.XXXXX},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CV}
+}</pre>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="wrap">
+    <p>&copy; 2027 Mono4D Authors. Page layout adapted for academic project use.</p>
+    <p class="thanks">Tsinghua University · BlueImage, vivo · Peng Cheng Laboratory · The University of Hong Kong</p>
+  </div>
+</footer>
+
+<!-- ================= LIGHTBOX ================= -->
+<div class="lb" id="lightbox" role="dialog" aria-modal="true" aria-label="Media viewer">
+  <button class="lb-close" id="lbClose" aria-label="Close">&times;</button>
+  <div id="lbBody"></div>
+</div>
+
+<script src="assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mono4D — Protected</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234a5bf5'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='15' font-weight='bold' fill='white' text-anchor='middle'%3EM4%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --accent: #4a5bf5;
+    --accent-2: #8f5cf6;
+    --ink: #12151c;
+    --ink-soft: #444b59;
+    --ink-mute: #7b8496;
+    --line: #e6e9f0;
+    --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+            "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; font-family: var(--font); color: var(--ink);
+    background:
+      radial-gradient(1000px 620px at 12% -10%, rgba(74,91,245,.10), transparent 62%),
+      radial-gradient(900px 560px at 88% 4%, rgba(143,92,246,.10), transparent 60%),
+      #fff;
+    display: grid; place-items: center; padding: 24px;
+  }
+  .card {
+    width: 100%; max-width: 380px; background: #fff;
+    border: 1px solid var(--line); border-radius: 18px;
+    box-shadow: 0 2px 6px rgba(18,21,28,.07), 0 24px 60px rgba(18,21,28,.10);
+    padding: 34px 30px 30px; text-align: center;
+  }
+  .mark {
+    width: 46px; height: 46px; border-radius: 14px; margin: 0 auto 18px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center; color: #fff;
+    font-weight: 800; font-size: 15px; letter-spacing: -.02em;
+    box-shadow: 0 8px 22px rgba(74,91,245,.30);
+  }
+  h1 { margin: 0 0 8px; font-size: 1.16rem; letter-spacing: -.02em; font-weight: 750; }
+  p.sub { margin: 0 0 22px; font-size: .845rem; color: var(--ink-mute); line-height: 1.55; }
+  label { display: block; text-align: left; font-size: .74rem; font-weight: 700;
+          letter-spacing: .08em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 7px; }
+  input[type="password"] {
+    width: 100%; padding: 11px 13px; font-size: .95rem; font-family: inherit;
+    color: var(--ink); background: #fbfcfe;
+    border: 1px solid var(--line); border-radius: 10px; outline: none;
+    transition: border-color .18s, box-shadow .18s, background .18s;
+  }
+  input[type="password"]:focus {
+    border-color: rgba(74,91,245,.55); background: #fff;
+    box-shadow: 0 0 0 3px rgba(74,91,245,.13);
+  }
+  button {
+    width: 100%; margin-top: 14px; padding: 11px 16px;
+    font-family: inherit; font-size: .93rem; font-weight: 650; color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border: 0; border-radius: 10px; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(74,91,245,.30);
+    transition: transform .15s, box-shadow .2s, opacity .2s;
+  }
+  button:hover { box-shadow: 0 8px 24px rgba(74,91,245,.38); }
+  button:active { transform: translateY(1px); }
+  button[disabled] { opacity: .6; cursor: default; transform: none; }
+  .err {
+    min-height: 18px; margin: 12px 0 0; font-size: .8rem; font-weight: 600;
+    color: #c0392b; text-align: left;
+  }
+  .foot { margin-top: 22px; font-size: .72rem; color: var(--ink-mute); }
+</style>
+</head>
+<body>
+  <form class="card" id="gate" autocomplete="off">
+    <div class="mark">M4</div>
+    <h1>Mono4D</h1>
+    <p class="sub">This project page is private.<br>Enter the password to continue.</p>
+    <label for="pw">Password</label>
+    <input type="password" id="pw" name="pw" autofocus autocomplete="current-password"
+           spellcheck="false" aria-describedby="err">
+    <button type="submit" id="go">Enter</button>
+    <p class="err" id="err" role="alert"></p>
+    <p class="foot">CVPR 2027 submission · internal preview</p>
+  </form>
+
+<script>
+(function () {
+  'use strict';
+
+  /* SHA-256 of the accepted password. The plaintext never appears in this file. */
+  var DIGEST = 'fa449ba0a0a50997cdff81fb4a1b43a411cb1fab568c3f2267ded6ec4bd49304';
+  var KEY = 'mono4d.unlocked';
+
+  var form = document.getElementById('gate');
+  var input = document.getElementById('pw');
+  var button = document.getElementById('go');
+  var errBox = document.getElementById('err');
+
+  function toHex(buffer) {
+    var bytes = new Uint8Array(buffer), out = '';
+    for (var i = 0; i < bytes.length; i++) {
+      out += (bytes[i] < 16 ? '0' : '') + bytes[i].toString(16);
+    }
+    return out;
+  }
+
+  function sha256(text) {
+    var data = new TextEncoder().encode(text);
+    return crypto.subtle.digest('SHA-256', data).then(toHex);
+  }
+
+  function unlock() {
+    try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+    document.documentElement.style.visibility = 'hidden';
+    location.replace('page.html');
+  }
+
+  try {
+    if (sessionStorage.getItem(KEY) === '1') { unlock(); return; }
+  } catch (e) {}
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var value = input.value;
+    if (!value) return;
+
+    button.disabled = true;
+    errBox.textContent = '';
+
+    sha256(value).then(function (digest) {
+      if (digest === DIGEST) {
+        unlock();
+      } else {
+        button.disabled = false;
+        errBox.textContent = 'Incorrect password.';
+        input.select();
+      }
+    }).catch(function () {
+      button.disabled = false;
+      errBox.textContent = 'This browser cannot verify the password. Please use a modern browser.';
+    });
+  });
+})();
+</script>
+</body>
+</html>
