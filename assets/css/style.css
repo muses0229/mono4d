@@ -208,7 +208,10 @@ thead th {
   padding: 11px 12px; text-align: center; white-space: nowrap;
   border-bottom: 1px solid var(--line);
 }
-thead th:first-child, tbody td:first-child { text-align: left; }
+/* Only the actual first column is left-aligned. Using `thead th:first-child`
+   also matched the metric heading that opens the second header row (PSNR),
+   which left it misaligned against its own centred numbers. */
+thead tr:first-child th:first-child, tbody td:first-child { text-align: left; }
 thead tr.grp th { font-size: .8rem; letter-spacing: .02em; }
 tbody td {
   padding: 9px 12px; text-align: center; border-bottom: 1px solid #f0f2f7;
