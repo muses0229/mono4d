@@ -197,34 +197,6 @@ figcaption b, figcaption strong { color: var(--ink); font-weight: 680; }
 .abstract-box p:last-child { margin-bottom: 0; }
 .abstract-box strong { color: var(--ink); font-weight: 680; }
 
-/* ---------------- highlights ---------------- */
-.hl-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 34px;
-}
-.hl {
-  background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 22px 22px 20px; box-shadow: var(--shadow-sm);
-  position: relative; overflow: hidden;
-  transition: transform .2s ease, box-shadow .25s ease;
-}
-.hl:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
-.hl::after {
-  content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  opacity: .85;
-}
-.hl:nth-child(2)::after { background: linear-gradient(90deg, var(--accent-2), #d45cf6); }
-.hl:nth-child(3)::after { background: linear-gradient(90deg, var(--accent-3), var(--accent)); }
-.hl .ico {
-  width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
-  background: rgba(74,91,245,.09); color: var(--accent); margin-bottom: 13px;
-}
-.hl:nth-child(2) .ico { background: rgba(143,92,246,.1); color: var(--accent-2); }
-.hl:nth-child(3) .ico { background: rgba(22,176,164,.11); color: var(--accent-3); }
-.hl .ico svg { width: 18px; height: 18px; }
-.hl h3 { font-size: 1rem; margin-bottom: 6px; }
-.hl p { margin: 0; font-size: .885rem; color: var(--ink-soft); line-height: 1.62; }
-
 /* ---------------- tables ---------------- */
 .table-wrap {
   overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius);
@@ -245,10 +217,12 @@ tbody td {
 tbody td:first-child { color: var(--ink); font-weight: 550; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr.sep td { border-top: 1px solid var(--line); }
-tbody tr.ours td { background: rgba(74,91,245,.045); color: var(--ink); font-weight: 620; }
-tbody tr.ours td:first-child { color: var(--accent); }
-.best { background: #d8f2e0; color: #14663a; font-weight: 700; border-radius: 5px; }
-.second { background: #fdf0cc; color: #7a5a06; font-weight: 650; border-radius: 5px; }
+tbody tr.ours td { background: rgba(74,91,245,.045); color: var(--ink); }
+tbody tr.ours td:first-child { color: var(--accent); font-weight: 620; }
+/* Highlighted numbers keep the same weight as the rest: bold glyphs are wider, which
+   breaks the vertical alignment of the decimal point inside a column. */
+.best { background: #d8f2e0; color: #14663a; border-radius: 5px; }
+.second { background: #fdf0cc; color: #7a5a06; border-radius: 5px; }
 td .best, td .second { display: inline-block; padding: 1px 6px; }
 caption, .tbl-cap {
   caption-side: top; text-align: left; font-size: .875rem; color: var(--ink-soft);
@@ -362,10 +336,7 @@ footer .thanks { font-size: .78rem; color: var(--ink-mute); }
 .js .reveal.in { opacity: 1; transform: none; }
 
 /* ---------------- responsive ---------------- */
-@media (max-width: 980px) {
-  .hl-grid { grid-template-columns: 1fr; }
-  .stats { grid-template-columns: repeat(2, 1fr); }
-}
+
 @media (max-width: 860px) {
   .nav-links {
     display: none; position: absolute; top: var(--nav-h); left: 0; right: 0;
