@@ -212,7 +212,8 @@ thead th:first-child, tbody td:first-child { text-align: left; }
 thead tr.grp th { font-size: .8rem; letter-spacing: .02em; }
 tbody td {
   padding: 9px 12px; text-align: center; border-bottom: 1px solid #f0f2f7;
-  font-variant-numeric: tabular-nums; color: var(--ink-soft); white-space: nowrap;
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+  color: var(--ink-soft); white-space: nowrap;
 }
 tbody td:first-child { color: var(--ink); font-weight: 550; }
 tbody tr:last-child td { border-bottom: none; }
@@ -221,6 +222,7 @@ tbody tr.ours td { background: rgba(74,91,245,.045); color: var(--ink); }
 tbody tr.ours td:first-child { color: var(--accent); font-weight: 620; }
 /* Highlighted numbers keep the same weight as the rest: bold glyphs are wider, which
    breaks the vertical alignment of the decimal point inside a column. */
+.best, .second { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 .best { background: #d8f2e0; color: #14663a; border-radius: 5px; }
 .second { background: #fdf0cc; color: #7a5a06; border-radius: 5px; }
 td .best, td .second { display: inline-block; padding: 1px 6px; }
