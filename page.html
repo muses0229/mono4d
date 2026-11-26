@@ -158,10 +158,11 @@
     <figure class="fig-card reveal">
       <img src="assets/figs/teaser.jpg" alt="Mono4D teaser: input monocular video, decomposed 4D scene with novel camera trajectory, novel view renderings, and a bubble chart comparing LPIPS against inference time." data-zoom="assets/figs/teaser.jpg">
       <figcaption>
-        <b>Mono4D overview.</b> <b>(a)</b> Given a monocular video, Mono4D decomposes the scene into a coherent
-        background and a temporally evolving dynamic Gaussian sequence, enabling real-time nearby novel view
-        synthesis. <b>(b)</b> Comparison against existing approaches; bubble area is inversely proportional to
-        LPIPS. Mono4D sits in the low-LPIPS / low-inference-time corner.
+        <b>Part(a): Monocular 4D Scene Reconstruction.</b> Given a monocular video input (left), Mono4D constructs
+        a coherent background Gaussian Splatting and a temporally evolving dynamic 3DGS sequence from per-frame
+        predictions of the feedforward 3DGS backbone (middle), enabling real-time nearby novel view synthesis for
+        dynamic scenes (right). <b>Part(b):</b> Bubble chart for comparison with the existing approaches. Note that
+        bubble size is inversely proportional to the LPIPS value.
       </figcaption>
     </figure>
   </div>
@@ -172,20 +173,18 @@
   <div class="wrap">
     <div class="sec-head reveal">
       <p class="sec-kicker">Method</p>
-      <h2 class="sec-subtitle">Geometry-aligned temporal Gaussian consolidation</h2>
-      <p class="sec-sub">
-        Per-frame feedforward predictions live in separate local spaces. Mono4D consolidates them into a shared
-        background plus a time-indexed foreground — then compresses the result into a compact 4D scene.
-      </p>
     </div>
 
     <figure class="fig-card reveal">
       <img src="assets/figs/pipeline.jpg" alt="Mono4D pipeline: motion segmentation, 3DGS backbone, camera estimation, geometry alignment, boundary-aware assignment, cross-frame static fusion, motion-aware spatiotemporal encoding, real-time rendering." data-zoom="assets/figs/pipeline.jpg">
       <figcaption>
-        <b>Pipeline.</b> Motion segmentation, camera estimation and a frozen feedforward 3DGS backbone run in
-        parallel. Geometry-aligned consolidation fuses per-frame Gaussians into a unified background and
-        foreground sequences, refining positions with boundary-aware assignment. Motion-aware spatiotemporal
-        Gaussian encoding then removes intra- and inter-frame redundancy for efficient 4D rendering.
+        <b>Overview of Mono4D.</b> Starting with a monocular video, we first estimate dynamic masks and camera
+        poses. With per-frame 3DGS obtained via feedforward backbone, our geometry-aligned temporal Gaussian
+        consolidation fuses independent per-frame Gaussians into a globally coherent representation, forming a
+        unified background scene and foreground sequences, while also refining the locations of Gaussians via
+        boundary-aware Gaussian assignment. We further introduce motion-aware spatiotemporal Gaussian encoding to
+        reduce intra-frame and inter-frame redundancy within the dynamic Gaussian sequence, enabling novel view
+        rendering of the 4D scene.
       </figcaption>
     </figure>
 
@@ -328,10 +327,6 @@
   <div class="wrap">
     <div class="sec-head reveal">
       <p class="sec-kicker">Results</p>
-      <p class="sec-sub">
-        A single-view video is used as input; novel views are evaluated on four excluded adjacent synchronized
-        views across real-world and synthetic benchmarks.
-      </p>
     </div>
 
     <div class="tbl reveal">
@@ -393,15 +388,13 @@
     <figure class="fig-card reveal" style="margin-top:36px">
       <img src="assets/figs/neural-3d_and_nvda-dyn_main.jpg" alt="Qualitative comparison on Neural-3D-Video and NVIDIA-Dynamic-Scene: input video, Inspatio-World, NeoVerse, MoVieS, Instant4D, Ours, ground truth." data-zoom="assets/figs/neural-3d_and_nvda-dyn_main.jpg">
       <figcaption>
-        <b>Qualitative comparison</b> on Neural-3D-Video and NVIDIA-Dynamic-Scene. Generative baselines show
-        texture degradation and temporal flicker; MoVieS distorts moving objects; Instant4D over-blurs textures.
-        Mono4D preserves detail on both moving subjects and cluttered backgrounds while staying temporally stable.
+        <b>Qualitative Comparison</b> on Neural-3D-Video and NVIDIA-Dynamic-Scene datasets.
       </figcaption>
     </figure>
 
     <figure class="fig-card reveal" style="margin-top:20px">
       <img src="assets/figs/neural-3d_and_nvda-dyn_appendix.jpg" alt="Qualitative comparison on Neural-3D-Video and NVIDIA-Dynamic-Scene." data-zoom="assets/figs/neural-3d_and_nvda-dyn_appendix.jpg">
-      <figcaption><b>More qualitative comparisons</b> on Neural-3D-Video and NVIDIA-Dynamic-Scene.</figcaption>
+      <figcaption><b>Qualitative Comparison on Neural-3D-Video and NVIDIA-Dynamic-Scene datasets.</b></figcaption>
     </figure>
 
     <div class="tbl reveal" style="margin-top:36px">
@@ -433,12 +426,12 @@
 
     <figure class="fig-card reveal" style="margin-top:36px">
       <img src="assets/figs/stereo-static.jpg" alt="Qualitative comparison on the synthetic StereoDataset." data-zoom="assets/figs/stereo-static.jpg">
-      <figcaption><b>Qualitative comparison on StereoDataset.</b> Mono4D keeps thin geometry and saturated textures that baselines blur or hallucinate.</figcaption>
+      <figcaption><b>Qualitative Comparison on StereoDataset.</b></figcaption>
     </figure>
 
     <figure class="fig-card reveal" style="margin-top:20px">
       <img src="assets/figs/vista4d-test.jpg" alt="Qualitative comparison on the Vista4D evaluation dataset." data-zoom="assets/figs/vista4d-test.jpg">
-      <figcaption><b>Qualitative comparison on the Vista4D evaluation dataset.</b></figcaption>
+      <figcaption><b>Qualitative Comparison on Vista4D evaluation dataset.</b></figcaption>
     </figure>
 
   </div>
