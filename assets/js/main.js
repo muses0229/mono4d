@@ -114,85 +114,118 @@
     });
   });
 
-  /* ---------- video cards: hover-preview + click-to-open ---------- */
-  var cards = Array.prototype.slice.call(document.querySelectorAll('.vcard'));
+  /* ---------- demo gallery: one stage, thumbnail sheet ---------- */
+  (function () {
+    var root = document.getElementById('demoGallery');
+    if (!root) return;
 
-  function pauseAll(except) {
-    cards.forEach(function (c) {
-      var v = c.querySelector('video');
-      if (!v || v === except) return;
-      if (!v.paused) v.pause();
-      c.classList.remove('playing');
-    });
-  }
+    var stage = document.getElementById('dgStage');
+    var counter = document.getElementById('dgCounter');
+    var tabs = Array.prototype.slice.call(root.querySelectorAll('.dg-tab'));
+    var panels = Array.prototype.slice.call(root.querySelectorAll('.dg-panel'));
 
-  cards.forEach(function (card) {
-    var frame = card.querySelector('.vframe');
-    var video = card.querySelector('video');
-    if (!frame || !video) return;
+    var currentGroup = 'wild';
 
-    /* lazy-load only when near viewport */
-    if ('IntersectionObserver' in window) {
-      var lio = new IntersectionObserver(function (entries) {
-        entries.forEach(function (en) {
-          if (!en.isIntersecting) return;
-          if (!video.getAttribute('src')) {
-            video.setAttribute('src', video.getAttribute('data-src') || '');
-          }
-          lio.unobserve(en.target);
-        });
-      }, { rootMargin: '260px 0px' });
-      lio.observe(video);
+    function thumbsOf(group) {
+      var panel = root.querySelector('.dg-panel#' + (group === 'wild' ? 'dg-panel-wild' : 'dg-panel-cmp'));
+      return panel ? Array.prototype.slice.call(panel.querySelectorAll('.dg-thumb')) : [];
     }
 
-    frame.addEventListener('mouseenter', function () {
-      pauseAll(video);
-      var p = video.play();
-      if (p && typeof p.catch === 'function') {
-        p.then(function () { card.classList.add('playing'); })
-         .catch(function () { /* autoplay blocked: keep poster */ });
-      } else {
-        card.classList.add('playing');
-      }
-    });
-    frame.addEventListener('mouseleave', function () {
-      if (!video.paused) video.pause();
-      card.classList.remove('playing');
-    });
-
-    frame.addEventListener('click', function () {
-      pauseAll(null);
-      var big = document.createElement('video');
-      big.src = video.currentSrc || video.getAttribute('src') || video.getAttribute('data-src');
-      big.poster = video.getAttribute('poster') || '';
-      big.controls = true;
-      big.autoplay = true;
-      big.loop = true;
-      big.muted = true;
-      big.playsInline = true;
-      openLightbox(big);
-      var p = big.play();
-      if (p && typeof p.catch === 'function') p.catch(function () {});
-    });
-  });
-
-  /* pause offscreen videos to save memory */
-  if ('IntersectionObserver' in window) {
-    var vio = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) {
-        var v = en.target;
-        if (!en.isIntersecting && !v.paused) {
-          v.pause();
-          var c = v.closest('.vcard');
-          if (c) c.classList.remove('playing');
-        }
+    function updateCounter() {
+      if (!counter) return;
+      var list = thumbsOf(currentGroup);
+      var index = 0;
+      list.forEach(function (b, i) {
+        if (b.getAttribute('aria-pressed') === 'true') index = i;
       });
-    }, { rootMargin: '120px 0px' });
-    cards.forEach(function (c) {
-      var v = c.querySelector('video');
-      if (v) vio.observe(v);
+      counter.textContent = (index + 1) + ' / ' + list.length;
+    }
+
+    function select(button, play) {
+      var src = button.getAttribute('data-src');
+      var label = button.getAttribute('data-label') || '';
+      if (!src || !stage) return;
+
+      var siblings = thumbsOf(currentGroup);
+      siblings.forEach(function (b) {
+        b.setAttribute('aria-pressed', b === button ? 'true' : 'false');
+      });
+
+      var poster = button.querySelector('img');
+      stage.poster = poster ? poster.getAttribute('src') : '';
+      stage.setAttribute('aria-label', label);
+      stage.src = src;
+      updateCounter();
+
+      if (play) {
+        var p = stage.play();
+        if (p && typeof p.catch === 'function') p.catch(function () {});
+      }
+    }
+
+    function showGroup(group) {
+      currentGroup = group;
+      tabs.forEach(function (t) {
+        var on = t.id === 'dg-tab-' + group;
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      panels.forEach(function (p) {
+        p.classList.toggle('is-active', p.id === 'dg-panel-' + group);
+      });
+      var first = thumbsOf(group)[0];
+      if (first) select(first, false);
+    }
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        showGroup(tab.id === 'dg-tab-cmp' ? 'cmp' : 'wild');
+      });
     });
-  }
+
+    root.querySelectorAll('.dg-thumb').forEach(function (btn) {
+      btn.addEventListener('click', function () { select(btn, true); });
+    });
+
+    /* click the stage to open the current clip full screen */
+    if (stage) {
+      stage.addEventListener('click', function (event) {
+        /* let the native controls work, only open the overlay on the picture */
+        if (event.target !== stage) return;
+        var big = document.createElement('video');
+        big.src = stage.currentSrc || stage.src;
+        big.poster = stage.poster || '';
+        big.controls = true;
+        big.autoplay = true;
+        big.loop = true;
+        big.muted = stage.muted;
+        big.playsInline = true;
+        openLightbox(big);
+        var p = big.play();
+        if (p && typeof p.catch === 'function') p.catch(function () {});
+      });
+
+      /* auto-advance when a clip ends */
+      stage.addEventListener('ended', function () {
+        var list = thumbsOf(currentGroup);
+        var i = list.findIndex(function (b) { return b.getAttribute('aria-pressed') === 'true'; });
+        if (i < 0 || !list.length) return;
+        select(list[(i + 1) % list.length], true);
+      });
+
+      /* pause when scrolled away */
+      if ('IntersectionObserver' in window) {
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) {
+            if (!en.isIntersecting && !stage.paused) stage.pause();
+          });
+        }, { rootMargin: '120px 0px' });
+        io.observe(stage);
+      }
+    }
+
+    var initial = thumbsOf('wild')[0];
+    if (initial) select(initial, false);
+  })();
 
   /* ---------- copy bibtex ---------- */
   var copyBtn = document.getElementById('copyBib');
