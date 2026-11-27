@@ -126,14 +126,19 @@
 
     var currentGroup = 'wild';
 
+    function panelOf(group) {
+      return root.querySelector('.dg-panel#dg-panel-' + group);
+    }
+
     function thumbsOf(group) {
-      var panel = root.querySelector('.dg-panel#' + (group === 'wild' ? 'dg-panel-wild' : 'dg-panel-cmp'));
+      var panel = panelOf(group);
       return panel ? Array.prototype.slice.call(panel.querySelectorAll('.dg-thumb')) : [];
     }
 
     function updateCounter() {
       if (!counter) return;
       var list = thumbsOf(currentGroup);
+      if (!list.length) { counter.textContent = ''; return; }
       var index = 0;
       list.forEach(function (b, i) {
         if (b.getAttribute('aria-pressed') === 'true') index = i;
@@ -174,11 +179,30 @@
       });
       var first = thumbsOf(group)[0];
       if (first) select(first, false);
+      if (stage) stage.pause();
     }
+
+    var splatFrame = document.getElementById('splatFrame');
+    var splatVeil = document.getElementById('splatVeil');
+    var splatBooted = false;
+
+    function bootSplat() {
+      if (splatBooted || !splatFrame) return;
+      splatBooted = true;
+      splatFrame.src = splatFrame.getAttribute('data-src');
+    }
+
+    window.addEventListener('message', function (event) {
+      if (event.data && event.data.type === 'mono4d-viewer-ready' && splatVeil) {
+        splatVeil.classList.add('hide');
+      }
+    });
 
     tabs.forEach(function (tab) {
       tab.addEventListener('click', function () {
-        showGroup(tab.id === 'dg-tab-cmp' ? 'cmp' : 'wild');
+        var group = tab.id.replace('dg-tab-', '');
+        showGroup(group);
+        if (group === '3d') bootSplat();
       });
     });
 

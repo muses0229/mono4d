@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mono4D — 4D Splat Viewer</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0c0f16; overflow: hidden;
+               font-family: -apple-system, "Segoe UI", Arial, sans-serif; }
+  #stage { position: absolute; inset: 0; }
+  #gl { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  #gl.dragging { cursor: grabbing; }
+
+  #hud { position: absolute; left: 14px; right: 14px; bottom: 14px;
+         display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+         color: #e9edf7; font-size: 12.5px; pointer-events: none; }
+  #hud .pill { pointer-events: auto; background: rgba(16,20,30,.72);
+               border: 1px solid rgba(255,255,255,.14); border-radius: 999px;
+               padding: 6px 12px; backdrop-filter: blur(8px); }
+  #bar { flex: 1 1 120px; height: 3px; border-radius: 2px;
+         background: rgba(255,255,255,.18); overflow: hidden; min-width: 70px; }
+  #barFill { height: 100%; width: 0%; background: linear-gradient(90deg,#4a5bf5,#8f5cf6); }
+
+  #status { position: absolute; inset: 0; display: grid; place-items: center;
+            color: #cfd6e6; font-size: 13px; background: rgba(12,15,22,.75);
+            transition: opacity .35s ease; }
+  #status.hide { opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl"></canvas>
+  <div id="hud">
+    <span class="pill" id="frameLabel">frame 1 / 1</span>
+    <div id="bar"><div id="barFill"></div></div>
+    <span class="pill">drag to orbit · scroll to zoom</span>
+  </div>
+  <div id="status">Loading 4D scene…</div>
+</div>
+
+<script type="module">
+const canvas = document.getElementById('gl');
+const statusEl = document.getElementById('status');
+const frameLabel = document.getElementById('frameLabel');
+const barFill = document.getElementById('barFill');
+
+const DATA = 'data/';
+const STRIDE = 32;                    // .splat row size in bytes
+const FRAME_MS = 1000 / 24;
+
+let gl, prog, vao, instBuf;
+let manifest = null, bgData = null;
+const fgCache = new Map();
+let frameIndex = 0, frameCount = 1, playing = true;
+let lastAdvance = 0;
+
+const cam = { yaw: 0, pitch: 0.05, dist: 4, target: [0, 0, 0] };
+const bounds = { min: [0, 0, 0], max: [1, 1, 1] };
+let sceneSpan = 1;
+let eye = [0, 0, -4];
+
+/* ------------------------------------------------------------------ math */
+function perspective(fovY, aspect, near, far) {
+  const f = 1 / Math.tan(fovY / 2);
+  const nf = 1 / (near - far);
+  return new Float32Array([
+    f / aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far + near) * nf, -1,
+    0, 0, 2 * far * near * nf, 0,
+  ]);
+}
+
+function lookAt(e, t, up) {
+  let zx = e[0] - t[0], zy = e[1] - t[1], zz = e[2] - t[2];
+  let l = Math.hypot(zx, zy, zz) || 1;
+  zx /= l; zy /= l; zz /= l;
+
+  let xx = up[1] * zz - up[2] * zy;
+  let xy = up[2] * zx - up[0] * zz;
+  let xz = up[0] * zy - up[1] * zx;
+  l = Math.hypot(xx, xy, xz) || 1;
+  xx /= l; xy /= l; xz /= l;
+
+  const yx = zy * xz - zz * xy;
+  const yy = zz * xx - zx * xz;
+  const yz = zx * xy - zy * xx;
+
+  return new Float32Array([
+    xx, yx, zx, 0,
+    xy, yy, zy, 0,
+    xz, yz, zz, 0,
+    -(xx * e[0] + xy * e[1] + xz * e[2]),
+    -(yx * e[0] + yy * e[1] + yz * e[2]),
+    -(zx * e[0] + zy * e[1] + zz * e[2]),
+    1,
+  ]);
+}
+
+/* --------------------------------------------------------------- shaders */
+const VERT = `#version 300 es
+precision highp float;
+
+layout(location=0) in vec2 aCorner;
+layout(location=1) in vec3 aPos;
+layout(location=2) in vec4 aColor;
+layout(location=3) in vec3 aScale;
+layout(location=4) in vec4 aRot;
+
+uniform mat4 uView;
+uniform mat4 uProj;
+uniform vec2 uViewport;
+uniform float uFocal;
+
+out vec4 vColor;
+out vec2 vLocal;
+
+vec3 qrot(vec4 q, vec3 v) {
+  return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+}
+
+void main() {
+  vec4 viewPos = uView * vec4(aPos, 1.0);
+  if (viewPos.z > -0.05) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
+
+  vec4 clip = uProj * viewPos;
+  float invZ = 1.0 / -viewPos.z;
+
+  vec3 sc = max(aScale, vec3(1e-6));
+  vec4 q = aRot * 2.0 - 1.0;
+  mat3 rotView = mat3(uView);
+  vec3 ax = rotView * qrot(q, vec3(sc.x, 0.0, 0.0));
+  vec3 ay = rotView * qrot(q, vec3(0.0, sc.y, 0.0));
+
+  vec2 p0 = ax.xy * invZ * uFocal;
+  vec2 p1 = ay.xy * invZ * uFocal;
+
+  vec2 offset = (aCorner.x * p0 + aCorner.y * p1) * 3.0;
+  float maxPx = min(uViewport.x, uViewport.y) * 0.3;
+  float len = length(offset);
+  if (len > maxPx) offset *= maxPx / len;
+  if (len < 1.5) offset = aCorner * 1.5;
+
+  clip.xy += offset / uViewport * 2.0 * clip.w;
+  gl_Position = clip;
+
+  vColor = aColor;
+  vLocal = aCorner;
+}`;
+
+const FRAG = `#version 300 es
+precision highp float;
+in vec4 vColor;
+in vec2 vLocal;
+out vec4 outColor;
+
+void main() {
+  float r2 = dot(vLocal, vLocal);
+  if (r2 > 1.0) discard;
+  float a = exp(-3.0 * r2) * vColor.a;
+  if (a < 0.30) discard;
+  outColor = vec4(vColor.rgb, 1.0);
+}`;
+
+/* ------------------------------------------------------------------- gl */
+function compile(type, src) {
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+    throw new Error(gl.getShaderInfoLog(sh) || 'shader compile failed');
+  }
+  return sh;
+}
+
+function initGL() {
+  gl = canvas.getContext('webgl2', { antialias: false, alpha: false, premultipliedAlpha: true });
+  if (!gl) throw new Error('WebGL2 is not available in this browser');
+
+  prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    throw new Error(gl.getProgramInfoLog(prog) || 'program link failed');
+  }
+  gl.useProgram(prog);
+
+  gl.enable(gl.DEPTH_TEST);
+  gl.depthFunc(gl.LESS);
+  gl.disable(gl.BLEND);
+
+  vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+  instBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+
+  gl.enableVertexAttribArray(1);          // position, 3 x float32 @ 0
+  gl.vertexAttribPointer(1, 3, gl.FLOAT, false, STRIDE, 0);
+  gl.vertexAttribDivisor(1, 1);
+
+  gl.enableVertexAttribArray(3);          // scale, 3 x float32 @ 12
+  gl.vertexAttribPointer(3, 3, gl.FLOAT, false, STRIDE, 12);
+  gl.vertexAttribDivisor(3, 1);
+
+  gl.enableVertexAttribArray(2);          // rgba, 4 x uint8 @ 24
+  gl.vertexAttribPointer(2, 4, gl.UNSIGNED_BYTE, true, STRIDE, 24);
+  gl.vertexAttribDivisor(2, 1);
+
+  gl.enableVertexAttribArray(4);          // rotation, 4 x uint8 @ 28
+  gl.vertexAttribPointer(4, 4, gl.UNSIGNED_BYTE, true, STRIDE, 28);
+  gl.vertexAttribDivisor(4, 1);
+}
+
+function upload(bytes) {
+  gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, bytes, gl.DYNAMIC_DRAW);
+  gl.bindVertexArray(vao);
+}
+
+/* ---------------------------------------------------------------- render */
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+  const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+  gl.viewport(0, 0, w, h);
+  return [w, h];
+}
+
+function render() {
+  const [w, h] = resize();
+  gl.clearColor(0.047, 0.059, 0.086, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  const cy = Math.cos(cam.pitch), sy = Math.sin(cam.pitch);
+  const ct = Math.cos(cam.yaw), st = Math.sin(cam.yaw);
+  // the dataset's first camera sits at the origin looking down +z,
+  // so the viewer orbits on the -z side to stay in front of the scene
+  eye = [
+    cam.target[0] - cam.dist * cy * st,
+    cam.target[1] + cam.dist * sy,
+    cam.target[2] - cam.dist * cy * ct,
+  ];
+
+  const view = lookAt(eye, cam.target, [0, -1, 0]);
+  const proj = perspective(0.75, w / h, 0.01, 1000);
+
+  gl.uniformMatrix4fv(gl.getUniformLocation(prog, 'uView'), false, view);
+  gl.uniformMatrix4fv(gl.getUniformLocation(prog, 'uProj'), false, proj);
+  gl.uniform2f(gl.getUniformLocation(prog, 'uViewport'), w, h);
+  gl.uniform1f(gl.getUniformLocation(prog, 'uFocal'), (h * 0.5) / Math.tan(0.75 / 2));
+
+  /* Two sorted draws: background first, then the current foreground frame.
+     Sorting close to a million rows every frame is too slow for playback, so
+     each layer is re-sorted only when the camera settles; the depth test keeps
+     the pair correctly ordered because the foreground sits well in front. */
+  /* These gaussians are almost fully opaque (alpha ~0.99), so the blend
+     result barely depends on draw order and sorting ~900k rows every frame
+     would stall playback. Straight blending is visually fine and stays fast. */
+  upload(bgData);
+  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, manifest.background.count);
+
+  const fg = fgCache.get(frameIndex);
+  if (fg) {
+    upload(fg);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, manifest.frames[frameIndex].count);
+  }
+}
+
+/* ----------------------------------------------------------- interaction */
+let dragging = false, px = 0, py = 0;
+canvas.addEventListener('pointerdown', (e) => {
+  dragging = true; px = e.clientX; py = e.clientY;
+  canvas.classList.add('dragging');
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  cam.yaw -= (e.clientX - px) * 0.008;
+  cam.pitch = Math.max(-1.15, Math.min(1.15, cam.pitch - (e.clientY - py) * 0.008));
+  px = e.clientX; py = e.clientY;
+});
+const stopDrag = (e) => {
+  dragging = false;
+  canvas.classList.remove('dragging');
+  if (e && e.pointerId !== undefined) {
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+  }
+};
+canvas.addEventListener('pointerup', stopDrag);
+canvas.addEventListener('pointercancel', stopDrag);
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const next = cam.dist * (1 + Math.sign(e.deltaY) * 0.08);
+  cam.dist = Math.max(sceneSpan * 0.12, Math.min(sceneSpan * 4, next));
+}, { passive: false });
+
+/* --------------------------------------------------------------- loading */
+const pending = [];
+
+async function grab(path, priority) {
+  const res = await fetch(path, priority ? { priority } : undefined);
+  if (!res.ok) throw new Error(res.status + ' for ' + path);
+  return res.arrayBuffer();
+}
+
+async function loadScene() {
+  manifest = await (await fetch(DATA + 'manifest.json')).json();
+
+  bounds.min = manifest.min;
+  bounds.max = manifest.max;
+  sceneSpan = Math.max(
+    bounds.max[0] - bounds.min[0],
+    bounds.max[1] - bounds.min[1],
+    bounds.max[2] - bounds.min[2],
+    1e-3,
+  );
+  cam.target = [
+    (bounds.min[0] + bounds.max[0]) / 2,
+    (bounds.min[1] + bounds.max[1]) / 2,
+    (bounds.min[2] + bounds.max[2]) / 2,
+  ];
+  cam.dist = sceneSpan * 0.72;
+
+  frameCount = manifest.frames.length;
+  frameLabel.textContent = 'frame 1 / ' + frameCount;
+
+  bgData = await grab(DATA + manifest.background.file, 'high');
+  fgCache.set(0, await grab(DATA + manifest.frames[0].file, 'high'));
+
+  statusEl.classList.add('hide');
+  requestAnimationFrame(loop);
+  try {
+    if (window.parent !== window) window.parent.postMessage({ type: 'mono4d-viewer-ready' }, '*');
+  } catch (_) {}
+
+  for (let i = 1; i < frameCount; i++) pending.push(i);
+  prefetch();
+}
+
+const PRELOAD_LANES = 4;
+
+/* Frames are independent files, so a handful are fetched in parallel and the
+   whole sequence is resident after a few seconds instead of minutes. */
+async function prefetch() {
+  const lane = async () => {
+    while (pending.length) {
+      const i = pending.shift();
+      if (fgCache.has(i)) continue;
+      try {
+        fgCache.set(i, await grab(DATA + manifest.frames[i].file, 'low'));
+        barFill.style.width = (fgCache.size / frameCount * 100).toFixed(1) + '%';
+      } catch (_) { /* a failed frame is retried on demand by the loop */ }
+    }
+  };
+  await Promise.all(Array.from({ length: PRELOAD_LANES }, lane));
+}
+
+function loop(now) {
+  if (playing && now - lastAdvance > FRAME_MS) {
+    /* Only step forward when the next frame is already in memory: advancing
+       past an unloaded frame would blank the foreground for that tick. */
+    const next = (frameIndex + 1) % frameCount;
+    if (fgCache.has(next)) {
+      lastAdvance = now;
+      frameIndex = next;
+      frameLabel.textContent = 'frame ' + (frameIndex + 1) + ' / ' + frameCount;
+    } else if (fgCache.size < frameCount) {
+      lastAdvance = now;                 // wait, do not spin the timer
+    } else {
+      lastAdvance = now;
+      frameIndex = next;
+      frameLabel.textContent = 'frame ' + (frameIndex + 1) + ' / ' + frameCount;
+    }
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+initGL();
+loadScene().catch((err) => {
+  statusEl.textContent = 'Could not load the scene: ' + err.message;
+  statusEl.classList.remove('hide');
+  console.error(err);
+});
+
+window.__splatReady = () => !!manifest && !!bgData;
+window.__splatInfo = () => ({
+  frames: frameCount,
+  frameIndex,
+  bg: manifest ? manifest.background.count : 0,
+  cached: fgCache.size,
+  span: sceneSpan,
+  camera: { ...cam },
+});
+window.__splatSetCamera = (yaw, pitch, dist) => {
+  cam.yaw = yaw; cam.pitch = pitch; cam.dist = dist;
+};
+window.__splatSeek = (i) => { frameIndex = i % frameCount; };
+window.__splatPause = () => { playing = false; };
+</script>
+</body>
+</html>
