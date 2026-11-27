@@ -45,7 +45,13 @@ const statusEl = document.getElementById('status');
 const frameLabel = document.getElementById('frameLabel');
 const barFill = document.getElementById('barFill');
 
+/* The splat payload is ~171 MB, which is slow to pull from GitHub Pages
+   directly. jsDelivr serves the same files from its CDN with brotli, roughly
+   halving the bytes, so the scene comes from there and falls back to the copy
+   committed next to this page if the CDN is unreachable. */
 const DATA = 'data/';
+const CDN_DATA = 'https://cdn.jsdelivr.net/gh/muses0229/mono4d@main/assets/viewer/data/';
+let dataBase = DATA;
 let STRIDE = 20;                      // row size, taken from the manifest at load time
 const FRAME_MS = 1000 / 24;
 
@@ -329,14 +335,33 @@ canvas.addEventListener('wheel', (e) => {
 /* --------------------------------------------------------------- loading */
 const pending = [];
 
-async function grab(path, priority) {
-  const res = await fetch(path, priority ? { priority } : undefined);
-  if (!res.ok) throw new Error(res.status + ' for ' + path);
-  return res.arrayBuffer();
+async function fetchJSON(name) {
+  for (const base of [CDN_DATA, DATA]) {
+    try {
+      const res = await fetch(base + name);
+      if (res.ok) { dataBase = base; return await res.json(); }
+    } catch (_) { /* try the next source */ }
+  }
+  throw new Error('could not load ' + name);
+}
+
+/* Frames come from the CDN first; if that request fails the local copy is
+   used so the page still works when the CDN is blocked or offline. */
+async function grab(name, priority) {
+  const order = dataBase === CDN_DATA ? [CDN_DATA, DATA] : [DATA];
+  let lastErr = null;
+  for (const base of order) {
+    try {
+      const res = await fetch(base + name, priority ? { priority } : undefined);
+      if (!res.ok) throw new Error(res.status + ' for ' + base + name);
+      return await res.arrayBuffer();
+    } catch (err) { lastErr = err; }
+  }
+  throw lastErr;
 }
 
 async function loadScene() {
-  manifest = await (await fetch(DATA + 'manifest.json')).json();
+  manifest = await fetchJSON('manifest.json');
   if (manifest.row) { STRIDE = manifest.row; setStride(STRIDE); }
 
   bounds.min = manifest.min;
@@ -358,8 +383,8 @@ async function loadScene() {
   frameCount = manifest.frames.length;
   frameLabel.textContent = 'frame 1 / ' + frameCount;
 
-  bgData = await grab(DATA + manifest.background.file, 'high');
-  fgCache.set(0, await grab(DATA + manifest.frames[0].file, 'high'));
+  bgData = await grab(manifest.background.file, 'high');
+  fgCache.set(0, await grab(manifest.frames[0].file, 'high'));
 
   statusEl.classList.add('hide');
   requestAnimationFrame(loop);
@@ -371,17 +396,18 @@ async function loadScene() {
   prefetch();
 }
 
-const PRELOAD_LANES = 4;
+const PRELOAD_LANES = 8;
 
-/* Frames are independent files, so a handful are fetched in parallel and the
-   whole sequence is resident after a few seconds instead of minutes. */
+/* Frames are independent files, so several are fetched in parallel. The
+   sequence is ~154 MB, so eight lanes keep the link busy without starving the
+   first frames that playback needs. */
 async function prefetch() {
   const lane = async () => {
     while (pending.length) {
       const i = pending.shift();
       if (fgCache.has(i)) continue;
       try {
-        fgCache.set(i, await grab(DATA + manifest.frames[i].file, 'low'));
+        fgCache.set(i, await grab(manifest.frames[i].file, 'low'));
         barFill.style.width = (fgCache.size / frameCount * 100).toFixed(1) + '%';
       } catch (_) { /* a failed frame is retried on demand by the loop */ }
     }
