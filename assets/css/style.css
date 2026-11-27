@@ -243,23 +243,6 @@ caption, .tbl-cap {
 .legend { display: flex; gap: 16px; font-size: .78rem; color: var(--ink-mute); padding: 10px 14px 0; align-items: center; flex-wrap: wrap; }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 
-/* ---------------- interactive 3D viewer ---------------- */
-.dg-3d {
-  position: relative; border-radius: var(--radius); overflow: hidden;
-  border: 1px solid var(--line); background: #0c0f16;
-  box-shadow: var(--shadow-md); aspect-ratio: 16 / 10; max-height: 78vh;
-}
-.dg-3d iframe { display: block; width: 100%; height: 100%; border: 0; }
-.dg-3d-veil {
-  position: absolute; inset: 0; display: grid; place-items: center;
-  background: rgba(12,15,22,.78); color: #cfd6e6; font-size: .86rem;
-  transition: opacity .35s ease; pointer-events: none;
-}
-.dg-3d-veil.hide { opacity: 0; }
-@media (max-width: 700px) {
-  .dg-3d { aspect-ratio: 4 / 3; }
-}
-
 /* ---------------- demo gallery: stage + thumbnails ---------------- */
 .dg { margin-top: 30px; }
 

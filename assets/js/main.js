@@ -182,27 +182,10 @@
       if (stage) stage.pause();
     }
 
-    var splatFrame = document.getElementById('splatFrame');
-    var splatVeil = document.getElementById('splatVeil');
-    var splatBooted = false;
-
-    function bootSplat() {
-      if (splatBooted || !splatFrame) return;
-      splatBooted = true;
-      splatFrame.src = splatFrame.getAttribute('data-src');
-    }
-
-    window.addEventListener('message', function (event) {
-      if (event.data && event.data.type === 'mono4d-viewer-ready' && splatVeil) {
-        splatVeil.classList.add('hide');
-      }
-    });
-
     tabs.forEach(function (tab) {
       tab.addEventListener('click', function () {
         var group = tab.id.replace('dg-tab-', '');
         showGroup(group);
-        if (group === '3d') bootSplat();
       });
     });
 
